@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 
+from dateutil import parser
+
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_SUNNY,
@@ -12,6 +14,7 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_HUMIDITY,
     ATTR_FORECAST_IS_DAYTIME,
     ATTR_FORECAST_NATIVE_DEW_POINT,
+    ATTR_FORECAST_NATIVE_PRECIPITATION,
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
     ATTR_FORECAST_PRECIPITATION_PROBABILITY,
@@ -123,6 +126,7 @@ class NWSWeather(CoordinatorWeatherEntity):
     _attr_native_pressure_unit = UnitOfPressure.PA
     _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
     _attr_native_visibility_unit = UnitOfLength.METERS
+    _attr_native_precipitation_unit = UnitOfLength.MILLIMETERS
 
     def __init__(
         self,
@@ -181,6 +185,11 @@ class NWSWeather(CoordinatorWeatherEntity):
     def _handle_twice_daily_forecast_coordinator_update(self) -> None:
         """Handle updated data from the twice daily forecast coordinator."""
         self._forecast_twice_daily = self.nws.forecast
+
+    # @callback
+    # def _handle_detailed_daily_forecast_coordinator_update(self) -> None:
+    #     """Handle updated data from the detailed forecast coordinator."""
+    #     self._forecast_detailed = self.nws.forecast
 
     @callback
     def _handle_legacy_forecast_coordinator_update(self) -> None:
@@ -296,6 +305,23 @@ class NWSWeather(CoordinatorWeatherEntity):
                 )
             else:
                 data[ATTR_FORECAST_NATIVE_WIND_SPEED] = None
+
+            if self.nws.detailed_forecast is not None:
+                details = self.nws.detailed_forecast
+                startTime = parser.parse(forecast_entry.get("startTime"))  # type: ignore [arg-type]
+                hoursToGet = 1
+                if mode == HOURLY:
+                    hoursToGet = 1
+                if mode == DAYNIGHT:
+                    # hoursToGet = 12 - hoursSinceLastPeriodicUpdate
+                    # perhaps use updateTime or validTimes from last update?
+                    hoursToGet = 12
+                detailedForecasts = details.get_details_by_hour(startTime, hoursToGet)
+                totalPrecip = 0
+                for detailedForecast in detailedForecasts:
+                    totalPrecip += detailedForecast["quantitativePrecipitation"]
+                data[ATTR_FORECAST_NATIVE_PRECIPITATION] = totalPrecip
+
             forecast.append(data)
         return forecast
 

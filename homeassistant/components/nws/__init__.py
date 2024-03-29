@@ -44,6 +44,7 @@ class NWSData:
     coordinator_observation: NwsDataUpdateCoordinator
     coordinator_forecast: NwsDataUpdateCoordinator
     coordinator_forecast_hourly: NwsDataUpdateCoordinator
+    coordinator_forecast_detailed: NwsDataUpdateCoordinator
 
 
 class NwsDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):  # pylint: disable=hass-enforce-coordinator-module
@@ -116,6 +117,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Retrieve recent observations."""
         await nws_data.update_observation(start_time=utcnow() - UPDATE_TIME_PERIOD)
 
+    async def update_forecast_hourly() -> None:
+        """Retrieve hourly and detailed forecasts."""
+        await nws_data.update_forecast_hourly()
+        await nws_data.update_detailed_forecast()
+
+    async def update_forecast() -> None:
+        """Retrieve twice-daily and detailed forecasts."""
+        await nws_data.update_forecast()
+        await nws_data.update_detailed_forecast()
+
     coordinator_observation = NwsDataUpdateCoordinator(
         hass,
         _LOGGER,
@@ -132,7 +143,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         _LOGGER,
         name=f"NWS forecast station {station}",
-        update_method=nws_data.update_forecast,
+        update_method=update_forecast,
         update_interval=DEFAULT_SCAN_INTERVAL,
         failed_update_interval=FAILED_SCAN_INTERVAL,
         request_refresh_debouncer=debounce.Debouncer(
@@ -144,25 +155,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         _LOGGER,
         name=f"NWS forecast hourly station {station}",
-        update_method=nws_data.update_forecast_hourly,
+        update_method=update_forecast_hourly,
         update_interval=DEFAULT_SCAN_INTERVAL,
         failed_update_interval=FAILED_SCAN_INTERVAL,
         request_refresh_debouncer=debounce.Debouncer(
             hass, _LOGGER, cooldown=DEBOUNCE_TIME, immediate=True
         ),
     )
+
+    coordinator_forecast_detailed = NwsDataUpdateCoordinator(
+        hass,
+        _LOGGER,
+        name=f"NWS forecast station {station}",
+        update_method=nws_data.update_detailed_forecast,
+        update_interval=DEFAULT_SCAN_INTERVAL,
+        failed_update_interval=FAILED_SCAN_INTERVAL,
+        request_refresh_debouncer=debounce.Debouncer(
+            hass, _LOGGER, cooldown=DEBOUNCE_TIME, immediate=True
+        ),
+    )
+
     nws_hass_data = hass.data.setdefault(DOMAIN, {})
     nws_hass_data[entry.entry_id] = NWSData(
         nws_data,
         coordinator_observation,
         coordinator_forecast,
         coordinator_forecast_hourly,
+        coordinator_forecast_detailed,
     )
 
     # Fetch initial data so we have data when entities subscribe
     await coordinator_observation.async_refresh()
     await coordinator_forecast.async_refresh()
     await coordinator_forecast_hourly.async_refresh()
+    await coordinator_forecast_detailed.async_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
