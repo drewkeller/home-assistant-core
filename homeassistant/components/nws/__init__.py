@@ -117,15 +117,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Retrieve recent observations."""
         await nws_data.update_observation(start_time=utcnow() - UPDATE_TIME_PERIOD)
 
-    async def update_forecast_hourly() -> None:
-        """Retrieve hourly and detailed forecasts."""
-        await nws_data.update_forecast_hourly()
-        await nws_data.update_detailed_forecast()
+    # async def update_forecast_hourly() -> None:
+    #     """Retrieve hourly and detailed forecasts."""
+    #     await nws_data.update_forecast_hourly()
+    #     await nws_data.update_detailed_forecast()
 
-    async def update_forecast() -> None:
-        """Retrieve twice-daily and detailed forecasts."""
-        await nws_data.update_forecast()
-        await nws_data.update_detailed_forecast()
+    # async def update_forecast() -> None:
+    #     """Retrieve twice-daily and detailed forecasts."""
+    #     await nws_data.update_forecast()
+    #     await nws_data.update_detailed_forecast()
 
     coordinator_observation = NwsDataUpdateCoordinator(
         hass,
@@ -143,7 +143,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         _LOGGER,
         name=f"NWS forecast station {station}",
-        update_method=update_forecast,
+        update_method=nws_data.update_forecast,
         update_interval=DEFAULT_SCAN_INTERVAL,
         failed_update_interval=FAILED_SCAN_INTERVAL,
         request_refresh_debouncer=debounce.Debouncer(
@@ -155,7 +155,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         _LOGGER,
         name=f"NWS forecast hourly station {station}",
-        update_method=update_forecast_hourly,
+        update_method=nws_data.update_forecast_hourly,
         update_interval=DEFAULT_SCAN_INTERVAL,
         failed_update_interval=FAILED_SCAN_INTERVAL,
         request_refresh_debouncer=debounce.Debouncer(
