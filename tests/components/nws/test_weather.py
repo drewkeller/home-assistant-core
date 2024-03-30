@@ -341,6 +341,7 @@ async def test_forecast_service(
     instance.update_observation.assert_called_once()
     instance.update_forecast.assert_called_once()
     instance.update_forecast_hourly.assert_called_once()
+    assert instance.update_detailed_forecast.call_count == 2
 
     for forecast_type in ("twice_daily", "hourly"):
         response = await hass.services.async_call(
@@ -368,6 +369,7 @@ async def test_forecast_service(
     assert instance.update_observation.call_count == 2
     assert instance.update_forecast.call_count == 2
     assert instance.update_forecast_hourly.call_count == 1
+    assert instance.update_detailed_forecast.call_count == 3
 
     for forecast_type in ("twice_daily", "hourly"):
         response = await hass.services.async_call(
@@ -386,6 +388,7 @@ async def test_forecast_service(
     assert instance.update_observation.call_count == 2
     assert instance.update_forecast.call_count == 2
     assert instance.update_forecast_hourly.call_count == 2
+    assert instance.update_detailed_forecast.call_count == 4
 
     # third update fails, but data is cached
     instance.update_forecast_hourly.side_effect = aiohttp.ClientError

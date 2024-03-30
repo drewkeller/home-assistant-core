@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
+
+from dateutil import parser
 
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
@@ -12,6 +15,7 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_HUMIDITY,
     ATTR_FORECAST_IS_DAYTIME,
     ATTR_FORECAST_NATIVE_DEW_POINT,
+    ATTR_FORECAST_NATIVE_PRECIPITATION,
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
     ATTR_FORECAST_PRECIPITATION_PROBABILITY,
@@ -123,6 +127,7 @@ class NWSWeather(CoordinatorWeatherEntity):
     _attr_native_pressure_unit = UnitOfPressure.PA
     _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
     _attr_native_visibility_unit = UnitOfLength.METERS
+    _attr_native_precipitation_unit = UnitOfLength.MILLIMETERS
 
     def __init__(
         self,
@@ -296,6 +301,45 @@ class NWSWeather(CoordinatorWeatherEntity):
                 )
             else:
                 data[ATTR_FORECAST_NATIVE_WIND_SPEED] = None
+
+            if self.nws.detailed_forecast is not None:
+                details = self.nws.detailed_forecast
+                startTime = parser.parse(forecast_entry.get("startTime"))  # type: ignore [arg-type]
+                hoursToGet = 1
+                if mode == HOURLY:
+                    hoursToGet = 1
+                    detailedForecasts = details.get_details_by_hour(
+                        startTime, hoursToGet
+                    )
+                if mode == DAYNIGHT:
+                    # Twice-daily forecasts are effective in 12-hour periods,
+                    # starting at 6AM and 6PM.
+                    # To get a forecast for each hour from the start time to
+                    # the next periodic forecast, the number of forecasts to
+                    # get is:
+                    #     (period + offset - (hour % period)) % period
+                    # When getting data in that manner, precipitation data
+                    # appears to be generated for blocks of 6 hours and
+                    # repeated for all 6 of those hours. Therefore, the
+                    # accumulation of the 12 hour period is obtained by using
+                    # the sum of two forecasts, one from each set of six.
+                    # The first forecast of the set of twelve, returns the
+                    # same precipitation amount as the previous set of six.
+                    # Therefore, a delta of +1 is used for the first time.
+                    hoursUntilNextPeriod = (18 - (startTime.hour % 12)) % 12
+                    delta1 = 1
+                    if hoursUntilNextPeriod == 0:
+                        hoursUntilNextPeriod = 12
+                        delta1 = 0
+                    times = [startTime + timedelta(hours=delta1)]
+                    if hoursUntilNextPeriod < 7:
+                        times.append(startTime + timedelta(hours=7))
+                    detailedForecasts = details.get_details_for_times(times)
+                totalPrecip = 0
+                for d in detailedForecasts:
+                    totalPrecip += d["quantitativePrecipitation"]
+                data[ATTR_FORECAST_NATIVE_PRECIPITATION] = totalPrecip
+
             forecast.append(data)
         return forecast
 
