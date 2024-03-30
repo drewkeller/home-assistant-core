@@ -317,7 +317,7 @@ class NWSWeather(CoordinatorWeatherEntity):
                     # To get a forecast for each hour from the start time to
                     # the next periodic forecast, the number of forecasts to
                     # get is:
-                    #     period + offset - (hour % period) % period
+                    #     (period + offset - (hour % period)) % period
                     # When getting data in that manner, precipitation data
                     # appears to be generated for blocks of 6 hours and
                     # repeated for all 6 of those hours. Therefore, the
@@ -326,7 +326,7 @@ class NWSWeather(CoordinatorWeatherEntity):
                     # The first forecast of the set of twelve, returns the
                     # same precipitation amount as the previous set of six.
                     # Therefore, a delta of +1 is used for the first time.
-                    hoursUntilNextPeriod = 18 - (startTime.hour % 12) % 12
+                    hoursUntilNextPeriod = (18 - (startTime.hour % 12)) % 12
                     delta1 = 1
                     if hoursUntilNextPeriod == 0:
                         hoursUntilNextPeriod = 12
